@@ -7,12 +7,10 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
 
 
-
 import pygame
 
 
 class Clickable:
-
 
 
     def __init__(self, x, y, width, height):
@@ -30,13 +28,18 @@ class Tile(Clickable):
         #x, y are the tiles position on the grid and not the screen
         super().__init__(x, y, grid_tile_width, grid_tile_height)
     
-    def draw(self, screen, angel_x, angel_y, angel_power, ):
-        if (angel_x + angel_power <= self.x and angel_x - angel_power >= self.x and 
-                angel_y + angel_power <= self.y and angel_y - angel_power >= self.y):
-            top = self.y - self.height // 2
-            left = self.x - self.width // 2
-            rect = pygame.Rect(left, top, self.width, self.height)
-            
+    def draw(self, screen, angel_x, angel_y, angel_power ):
+        ## Check if the tile is within the angel's range
+        ## if the tile is within the angel's range, draw it
+        ## Otherwise, draw it as gray
+        top = self.y - self.height // 2
+        left = self.x - self.width // 2
+        rect = pygame.Rect(left, top, self.width, self.height)
+        if (self.x >= angel_x - angel_power and self.x <= angel_x + angel_power and
+                self.y >= angel_y - angel_power and self.y <= angel_y + angel_power):
+            pygame.draw.rect(screen, (123, 242, 242), rect)
+        else:
+            pygame.draw.rect(screen, (200, 200, 200), rect)
 
 
 class Block:
@@ -61,7 +64,7 @@ class Block:
 
 class Button(Clickable):
 
-    def __init__(self, x, y, width, height, text):
+    def __init__(self, x, y, width, height, text,option):
         super().__init__(x, y, width, height)
         self.text = text
 
@@ -84,6 +87,7 @@ class GameState:
         self.grid_centre_y = 0
         self.screen = None
         self.clock = None
+        self.angel_power = 1
         self.blocks = []
 
     def add_clock(self, clock):
@@ -111,7 +115,8 @@ def main():
     end = startScreen(game_state)
 
     while not end:
-        menu(game_state)
+        start, end = menu(game_state)
+        if start:
 
     exitGame()
 
@@ -156,7 +161,7 @@ def menu(game_state):
     SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
     clock = game_state.clock
     screen = game_state.screen
-    ClearScreen(screen, (230, 230, 230))
+    clearScreen(screen, (230, 230, 230))
     play_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 25, 100, 50, "Play")
     options_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 25, 100, 50, "Options")
     exit_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 75, 100, 50, "Exit")
@@ -167,28 +172,43 @@ def menu(game_state):
             if event.type == pygame.QUIT:
                 end = True
             if event.type == pygame.MOUSEBUTTONDOWN:
-                print("hi")
                 mouse_x, mouse_y = event.pos
                 if (play_button.x <= mouse_x <= play_button.x + play_button.width and
                     play_button.y <= mouse_y <= play_button.y + play_button.height):
                     start = True
                 elif (options_button.x <= mouse_x <= options_button.x + options_button.width and
                         options_button.y <= mouse_y <= options_button.y + options_button.height):
-                    Options()
+                    options()
                 elif (exit_button.x <= mouse_x <= exit_button.x + exit_button.width and
                         exit_button.y <= mouse_y <= exit_button.y + exit_button.height):
                     end = True
-                    print("Exiting...")
-        ClearScreen(screen)
+        clearScreen(screen)
         play_button.draw(screen)
         options_button.draw(screen)
         exit_button.draw(screen)
         pygame.display.update()
         clock.tick(60)
+    return start, end
 
 
-def options():
-    pass
+def options(game_state):
+    # Add the option to change the angel's power using up and down buttons
+    SCREEN_WIDTH = game_state.SCREEN_WIDTH
+    SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
+    clock = game_state.clock
+    screen = game_state.screen
+    angel_power = game_state.angel_power
+    clearScreen(screen, (230, 230, 230))
+
+    title = pygame.font.Font(None, 74).render("Options", True, (0, 0, 0))
+    title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+    screen.blit(title, title_rect)
+    angel_power_text = pygame.font.Font(None, 36).render(f"Angel Power: {angel_power}", True, (0, 0, 0))
+    angel_power_text_rect = angel_power_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+    screen.blit(angel_power_text, angel_power_text_rect)
+    up_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, 100, 50, "Up")
+    down_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100, 100, 50, "Down")
+
 
 def gameloop():
     pass
@@ -231,5 +251,5 @@ def exitGame():
     sys.exit()
 
 if __name__=="__main__":
-    Main()
+    main()
 
