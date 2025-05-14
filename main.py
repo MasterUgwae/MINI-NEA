@@ -7,14 +7,19 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
 
 
+
+
 import pygame
 
 
 class Clickable:
 
 
+
+
+
     def __init__(self, x, y, width, height):
-        self.x = y
+        self.x = x
         self.y = y
         self.width = width
         self.height = height
@@ -27,7 +32,7 @@ class Tile(Clickable):
     def __init__(self, x, y, grid_tile_width, grid_tile_height):
         #x, y are the tiles position on the grid and not the screen
         super().__init__(x, y, grid_tile_width, grid_tile_height)
-    
+
     def draw(self, screen, angel_x, angel_y, angel_power ):
         ## Check if the tile is within the angel's range
         ## if the tile is within the angel's range, draw it
@@ -64,7 +69,7 @@ class Block:
 
 class Button(Clickable):
 
-    def __init__(self, x, y, width, height, text,option):
+    def __init__(self, x, y, width, height, text):
         super().__init__(x, y, width, height)
         self.text = text
 
@@ -74,6 +79,10 @@ class Button(Clickable):
         text_surface = font.render(self.text, True, (0, 0, 0))
         text_rect = text_surface.get_rect(center=(self.x, self.y))
         screen.blit(text_surface, text_rect)
+
+    def is_clicked(self, mouse_x, mouse_y):
+        return (self.x - self.width // 2 <= mouse_x <= self.x + self.width // 2 and
+                self.y - self.height // 2 <= mouse_y <= self.y + self.height // 2)
 
 
 class GameState:
@@ -116,8 +125,6 @@ def main():
 
     while not end:
         start, end = menu(game_state)
-        if start:
-
     exitGame()
 
 def startScreen(game_state):
@@ -141,8 +148,7 @@ def startScreen(game_state):
                 end = True
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
-                if (startButton.x <= mouse_x <= startButton.x + startButton.width and
-                        startButton.y <= mouse_y <= startButton.y + startButton.height):
+                if startButton.is_clicked(mouse_x, mouse_y):
                     start = True
 
         screen.fill((255, 255, 255))
@@ -173,14 +179,11 @@ def menu(game_state):
                 end = True
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
-                if (play_button.x <= mouse_x <= play_button.x + play_button.width and
-                    play_button.y <= mouse_y <= play_button.y + play_button.height):
+                if (play_button.is_clicked(mouse_x, mouse_y)):
                     start = True
-                elif (options_button.x <= mouse_x <= options_button.x + options_button.width and
-                        options_button.y <= mouse_y <= options_button.y + options_button.height):
-                    options()
-                elif (exit_button.x <= mouse_x <= exit_button.x + exit_button.width and
-                        exit_button.y <= mouse_y <= exit_button.y + exit_button.height):
+                elif (options_button.is_clicked(mouse_x, mouse_y)):
+                    game_state = options(game_state)
+                elif (exit_button.is_clicked(mouse_x, mouse_y)):
                     end = True
         clearScreen(screen)
         play_button.draw(screen)
@@ -208,10 +211,93 @@ def options(game_state):
     screen.blit(angel_power_text, angel_power_text_rect)
     up_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, 100, 50, "Up")
     down_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100, 100, 50, "Down")
+    back_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 150, 100, 50, "Back")
+    loop = True
+    while loop:
+        clearScreen(screen, (230, 230, 230))
+        back_button.draw(screen)
+        up_button.draw(screen)
+        down_button.draw(screen)
+        angel_power_text = pygame.font.Font(None, 36).render(f"Angel Power: {angel_power}", True, (0, 0, 0))
+        angel_power_text_rect = angel_power_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        screen.blit(angel_power_text, angel_power_text_rect)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                loop = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                if (up_button.is_clicked(mouse_x, mouse_y)):
+                    angel_power += 1
+                    game_state.angel_power = angel_power
+                elif (down_button.is_clicked(mouse_x, mouse_y)):
+                    if (angel_power > 1):
+                        angel_power -= 1
+                        game_state.angel_power = angel_power
+                    else:
+                        angel_power = 1
+                elif (back_button.is_clicked(mouse_x, mouse_y)):
+                    loop = False
+
+        pygame.display.update()
+        clock.tick(60)
+    return game_state
 
 
-def gameloop():
-    pass
+
+def gameloop(game_state):
+    SCREEN_WIDTH = game_state.SCREEN_WIDTH
+    SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
+    clock = game_state.clock
+    screen = game_state.screen
+    grid_width = game_state.GRID_WIDTH
+    grid_height = game_state.GRID_HEIGHT
+    grid_centre_x = game_state.grid_centre_x
+    grid_centre_y = game_state.grid_centre_y
+    angel_power = game_state.angel_power
+    player_turn = 0
+    current_player = "Angel"
+    blocked_tiles = []
+    grid = []
+    for i in range(10):
+        grid.append([])
+        for j in range(10):
+            grid[i].append(Tile(i, j, grid_width, grid_height))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                exitGame()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                if current_player == "Devil":
+                    if (mouse_x >= grid_centre_x - grid_width // 2 and mouse_x <= grid_centre_x + grid_width // 2 and
+                            mouse_y >= grid_centre_y - grid_height // 2 and mouse_y <= grid_centre_y + grid_height // 2):
+                        # Get the tile that was clicked
+                        tile_x = (mouse_x - (grid_centre_x - grid_width // 2)) // (grid_width // 10)
+                        tile_y = (mouse_y - (grid_centre_y - grid_height // 2)) // (grid_height // 10)
+                        # Check if the tile is blocked
+                        if (tile_x, tile_y) not in blocked_tiles:
+                            blocked_tiles.append((tile_x, tile_y))
+                            game_state.add_block(Block())
+                            game_state.blocks[-1].x = tile_x
+                            game_state.blocks[-1].y = tile_y
+                            game_state.blocks[-1].turn_placed = player_turn
+                            player_turn += 1
+                            current_player = "Angel"
+                if current_player == "Angel":
+
+
+        screen.fill((255, 255, 255))
+        for i in range(10):
+            for j in range(10):
+                grid[i][j].draw(screen, grid_centre_x, grid_centre_y, angel_power)
+
+        for block in game_state.blocks:
+            block.draw(screen, grid_centre_x, grid_centre_y, grid_height, grid_width)
+
+        pygame.display.update()
+        clock.tick(60)
+
 
 def handleInput():
     pass
