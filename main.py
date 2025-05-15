@@ -8,12 +8,10 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
 
 
-
 import pygame
 
 
 class Clickable:
-
 
 
 
@@ -23,9 +21,6 @@ class Clickable:
         self.y = y
         self.width = width
         self.height = height
-
-    def draw(self, screen):
-        pygame.draw.rect(screen, (255, 0, 0), (self.x, self.y, self.width, self.height))
 
 class Tile(Clickable):
 
@@ -37,35 +32,30 @@ class Tile(Clickable):
         ## Check if the tile is within the angel's range
         ## if the tile is within the angel's range, draw it
         ## Otherwise, draw it as gray
-        top = self.y - self.height // 2
-        left = self.x - self.width // 2
-        rect = pygame.Rect(left, top, self.width, self.height)
-        if (self.x >= angel_x - angel_power and self.x <= angel_x + angel_power and
+        rect = pygame.Rect(self.x * self.width, self.y * self.height, self.width, self.height)
+        if (self.x == angel_x and self.y == angel_y):
+            pygame.draw.rect(screen, (255, 251, 0), rect)
+        elif (self.x >= angel_x - angel_power and self.x <= angel_x + angel_power and
                 self.y >= angel_y - angel_power and self.y <= angel_y + angel_power):
             pygame.draw.rect(screen, (123, 242, 242), rect)
         else:
             pygame.draw.rect(screen, (200, 200, 200), rect)
 
+class BlockedTile(Clickable):
 
-class Block:
+    def __init__(self, x, y, grid_tile_width, grid_tile_height):
+        super().__init__(x, y, grid_tile_width, grid_tile_height)
 
-    def __init__(self) -> None:
-        self.x = 0
-        self.y = 0
-        self.turn_placed = 0
+    def is_on_grid(self, grid_left, grid_top, grid_height, grid_width):
+        return (self.x >= grid_left and
+                self.x <= grid_left + grid_width and
+                self.y >= grid_top and
+                self.y <= grid_top + grid_height)
 
-    def is_on_grid(self, grid_center_x, grid_center_y, grid_height, grid_width):
-        return (self.x >= grid_center_x - grid_width // 2 and
-                self.x <= grid_center_x + grid_width // 2 and
-                self.y >= grid_center_y - grid_height // 2 and
-                self.y <= grid_center_y + grid_height // 2)
-
-    def draw(self, screen, grid_center_x, grid_center_y, grid_height, grid_width):
-        block_width = grid_width // 10
-        block_height = grid_height // 10
-        block_x = grid_center_x - grid_width // 2 + (self.x * block_width)
-        block_y = grid_center_y - grid_height // 2 + (self.y * block_height)
-        pygame.draw.rect(screen, (125, 19, 19), (block_x, block_y, block_width, block_height))
+    def draw(self, screen, grid_left, grid_top):
+        block_x = grid_left + (self.x * self.width)
+        block_y = grid_top - (self.y * self.height)
+        pygame.draw.rect(screen, (125, 19, 19), (block_x, block_y, self.width, self.height))
 
 class Button(Clickable):
 
@@ -84,7 +74,6 @@ class Button(Clickable):
         return (self.x - self.width // 2 <= mouse_x <= self.x + self.width // 2 and
                 self.y - self.height // 2 <= mouse_y <= self.y + self.height // 2)
 
-
 class GameState:
 
     def __init__(self):
@@ -92,12 +81,14 @@ class GameState:
         self.SCREEN_HEIGHT = 600
         self.GRID_WIDTH = self.SCREEN_WIDTH // 100
         self.GRID_HEIGHT = self.SCREEN_HEIGHT // 100
-        self.grid_centre_x = 0
-        self.grid_centre_y = 0
+        self.grid_left = 0
+        self.grid_top = 0
         self.screen = None
         self.clock = None
         self.angel_power = 1
         self.blocks = []
+        self.angel_x = 0
+        self.angel_y = 0
 
     def add_clock(self, clock):
         self.clock = clock
@@ -107,7 +98,6 @@ class GameState:
 
     def add_block(self, block):
         self.blocks.append(block)
-
 
 def main():
     game_state = GameState()
@@ -122,9 +112,12 @@ def main():
     game_state.add_clock(clock)
 
     end = startScreen(game_state)
-
-    while not end:
+    start = False
+    while not (end or start):
         start, end = menu(game_state)
+        print("ended menu")
+        if start:
+            game_state = gameloop(game_state)
     exitGame()
 
 def startScreen(game_state):
@@ -161,7 +154,6 @@ def startScreen(game_state):
     else:
         return False
 
-
 def menu(game_state):
     SCREEN_WIDTH = game_state.SCREEN_WIDTH
     SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
@@ -192,7 +184,6 @@ def menu(game_state):
         pygame.display.update()
         clock.tick(60)
     return start, end
-
 
 def options(game_state):
     # Add the option to change the angel's power using up and down buttons
@@ -243,8 +234,6 @@ def options(game_state):
         clock.tick(60)
     return game_state
 
-
-
 def gameloop(game_state):
     SCREEN_WIDTH = game_state.SCREEN_WIDTH
     SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
@@ -252,9 +241,10 @@ def gameloop(game_state):
     screen = game_state.screen
     grid_width = game_state.GRID_WIDTH
     grid_height = game_state.GRID_HEIGHT
-    grid_centre_x = game_state.grid_centre_x
-    grid_centre_y = game_state.grid_centre_y
+    grid_left = game_state.grid_left
+    grid_top = game_state.grid_top
     angel_power = game_state.angel_power
+    MOVE_KEYS = [pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]
     player_turn = 0
     current_player = "Angel"
     blocked_tiles = []
@@ -270,58 +260,73 @@ def gameloop(game_state):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if current_player == "Devil":
-                    if (mouse_x >= grid_centre_x - grid_width // 2 and mouse_x <= grid_centre_x + grid_width // 2 and
-                            mouse_y >= grid_centre_y - grid_height // 2 and mouse_y <= grid_centre_y + grid_height // 2):
-                        # Get the tile that was clicked
-                        tile_x = (mouse_x - (grid_centre_x - grid_width // 2)) // (grid_width // 10)
-                        tile_y = (mouse_y - (grid_centre_y - grid_height // 2)) // (grid_height // 10)
-                        # Check if the tile is blocked
-                        if (tile_x, tile_y) not in blocked_tiles:
-                            blocked_tiles.append((tile_x, tile_y))
-                            game_state.add_block(Block())
-                            game_state.blocks[-1].x = tile_x
-                            game_state.blocks[-1].y = tile_y
-                            game_state.blocks[-1].turn_placed = player_turn
-                            player_turn += 1
-                            current_player = "Angel"
-                if current_player == "Angel":
+                    game_state, blocked_tiles = placeBlockedTile(game_state, mouse_x, mouse_y, blocked_tiles)
+                    current_player = "Angel"
+                elif current_player == "Angel":
+                    tile_x = (mouse_x - grid_left) // grid_width
+                    tile_y = (mouse_y - grid_top) // grid_height
+                    print("clicked:",tile_x, tile_y)
+                    print("angel at:", game_state.angel_x, game_state.angel_y)
+                    if checkLegalMove(game_state, tile_x, tile_y):
+                        game_state.angel_x = tile_x + grid_left
+                        game_state.angel_y = tile_y + grid_top 
+                        current_player = "Devil"
+            if event.type == pygame.KEYDOWN:
+                if event.key in MOVE_KEYS:
+                    game_state = moveGrid(game_state, event.key)
+                    grid_left = game_state.grid_left
+                    grid_top = game_state.grid_top
 
+        renderGrid(screen, game_state, grid)
 
-        screen.fill((255, 255, 255))
-        for i in range(10):
-            for j in range(10):
-                grid[i][j].draw(screen, grid_centre_x, grid_centre_y, angel_power)
+ 
 
-        for block in game_state.blocks:
-            block.draw(screen, grid_centre_x, grid_centre_y, grid_height, grid_width)
+def renderGrid(screen, game_state, grid):
+    clock = game_state.clock
+    screen.fill((255, 255, 255))
+    for i in range(10):
+        for j in range(10):
+            grid[i][j].draw(screen, game_state.grid_left - game_state.angel_x, game_state.grid_top - game_state.angel_y, game_state.angel_power)
 
-        pygame.display.update()
-        clock.tick(60)
+    for block in game_state.blocks:
+        block.draw(screen, game_state.grid_left, game_state.grid_top)
+    
+    pygame.display.update()
+    clock.tick(60)
 
+def moveGrid(game_state, key):
+    if key == pygame.K_w:
+        game_state.grid_top -= 1
+    elif key == pygame.K_s:
+        game_state.grid_top += 1
+    elif key == pygame.K_a:
+        game_state.grid_left -= 1
+    elif key == pygame.K_d:
+        game_state.grid_left += 1
+    return game_state
 
-def handleInput():
-    pass
+def placeBlockedTile(game_state, mouse_x, mouse_y, blocked_tiles):
+    grid_width = game_state.GRID_WIDTH
+    grid_height = game_state.GRID_HEIGHT
+    grid_left = game_state.grid_left
+    grid_top = game_state.grid_top
+    tile_x = (mouse_x - grid_left) // grid_width
+    tile_y = (mouse_y - grid_top) // grid_height
+    if (tile_x >= 0 and tile_x < 10 and tile_y >= 0 and tile_y < 10) and not(any(i.x == tile_x and i.y == tile_y for i in blocked_tiles)) and not(tile_x == game_state.angel_x - grid_left and tile_y == game_state.angel_y - grid_top):
+        blocked_tiles.append(BlockedTile(tile_x, tile_y, grid_width // 10, grid_height // 10))
+        game_state.add_block(blocked_tiles[-1])
+    return game_state, blocked_tiles
 
-def renderGrid():
-    pass
-
-def moveGrid():
-    pass
-
-def getBlockedTiles():
-    pass
-
-def placeBlockedTile():
-    pass
-
-def findLegalMoves():
-    pass
-
-def highlightLegalMoves():
-    pass
-
-def checkLegalMove():
-    pass
+def checkLegalMove(game_state, tile_x, tile_y):
+    grid_left = game_state.grid_left
+    grid_top = game_state.grid_top
+    angel_x = game_state.angel_x
+    angel_y = game_state.angel_y
+    blocked_tiles = game_state.blocks
+    if (tile_x >= 0 and tile_x < 10 and tile_y >= 0 and tile_y < 10) and not(any(i.x == tile_x and i.y == tile_y for i in blocked_tiles)) and not(tile_x == angel_x and tile_y == angel_y) and tile_x >= angel_x - game_state.angel_power and tile_x <= angel_x + game_state.angel_power and tile_y >= angel_y - game_state.angel_power and tile_y <= angel_y + game_state.angel_power:
+        print("legal move")
+        return True
+    return False
 
 def undoMove():
     pass
