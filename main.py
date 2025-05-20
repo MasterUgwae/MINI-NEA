@@ -11,10 +11,12 @@ import sys
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
 
+
 import pygame
 
 
 class Clickable:
+
 
 
     def __init__(self, x, y, width, height):
@@ -452,6 +454,18 @@ def renderGrid(screen, game_state, grid, current_player, turn_number):
     turn_text = font.render(f"Turn: {turn_number}", True, (0, 0, 0))
     turn_rect = turn_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 125))
     screen.blit(turn_text, turn_rect)
+
+    coordinates_text = font.render(f"Current Coordinates: ({game_state.grid_left + game_state.GRID_COLS // 2}, {game_state.grid_top + game_state.GRID_ROWS // 2})", True, (0, 0, 0))
+    coordinates_rect = coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 175))
+    screen.blit(coordinates_text, coordinates_rect)
+
+    angel_coordinates_text = font.render(f"Angel Coordinates: ({game_state.angel_x}, {game_state.angel_y})", True, (0, 0, 0))
+    angel_coordinates_rect = angel_coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 225))
+    screen.blit(angel_coordinates_text, angel_coordinates_rect)
+
+    last_block_coordinates_text = font.render(f"Last Block Coordinates: ({game_state.blocks[-1].x if game_state.blocks else 'None'}, {game_state.blocks[-1].y if game_state.blocks else 'None'})", True, (0, 0, 0))
+    last_block_coordinates_rect = last_block_coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 275))
+    screen.blit(last_block_coordinates_text, last_block_coordinates_rect)
 
 
 
