@@ -113,7 +113,7 @@ class GameState:
 
         # Angel's absolute position (tile coordinates) and power
         self.angel_power = 1
-        self.angel_x = 0  
+        self.angel_x = 0
         self.angel_y = 0
 
         # List of BlockedTiles (using absolute coordinates)
@@ -273,8 +273,8 @@ def options(game_state):
 
 # A helper to center the grid view on a given move.
 def center_grid_on_move(game_state, move_x, move_y):
-    half_cols = game_state.GRID_COLS // 2  
-    half_rows = game_state.GRID_ROWS // 2   
+    half_cols = game_state.GRID_COLS // 2
+    half_rows = game_state.GRID_ROWS // 2
     game_state.grid_left = move_x - half_cols
     game_state.grid_top = move_y - half_rows
 
@@ -292,8 +292,8 @@ def gameloop(game_state):
     turn_number = 1
     grid = [[Tile(i, j, grid_width, grid_height) for j in range(game_state.GRID_ROWS)]
             for i in range(game_state.GRID_COLS)]  # 10x10 grid as before
-
-    while True:
+    win = False
+    while not win:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exitGame()
@@ -327,7 +327,7 @@ def gameloop(game_state):
                             move = Move("angel", tile_x, tile_y)
                             game_state.undo_stack.append(move)
                             game_state.redo_stack.clear()
-                            
+
                             # Update angel's state.
                             game_state.angel_x = tile_x
                             game_state.angel_y = tile_y
@@ -343,25 +343,25 @@ def gameloop(game_state):
                             tile_y >= game_state.grid_top and tile_y < game_state.grid_top + game_state.GRID_ROWS):
                             # Prevent duplicate block placements and block if angel is here.
                             if not any(b.x == tile_x and b.y == tile_y for b in game_state.blocks) and \
-                               not (tile_x == game_state.angel_x and tile_y == game_state.angel_y):
+                                not (tile_x == game_state.angel_x and tile_y == game_state.angel_y):
                                 new_block = BlockedTile(tile_x, tile_y, grid_width, grid_height)
                                 move = Move("block", tile_x, tile_y)
                                 game_state.undo_stack.append(move)
                                 game_state.redo_stack.clear()
-                                
+
                                 game_state.blocks.append(new_block)
                                 current_player = "Angel"
                                 turn_number += 1
                                 if checkWin(game_state):
-                                    print("Devil wins!")
-                                    exitGame()
+                                    win = True
 
             if event.type == pygame.KEYDOWN:
                 if event.key in [pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d]:
                     game_state = moveGrid(game_state, event.key)
-                    
+
         renderGrid(screen, game_state, grid, current_player, turn_number)
         # Optionally, render the UI buttons in the UI region.
+
 
 # The undoMove function is where we now center the grid.
 def undoMove(game_state):
@@ -416,7 +416,7 @@ def redoMove(game_state):
 
     game_state.undo_stack.append(move)
     return game_state
- 
+
 
 def renderGrid(screen, game_state, grid, current_player, turn_number):
     clock = game_state.clock
@@ -432,7 +432,7 @@ def renderGrid(screen, game_state, grid, current_player, turn_number):
     for block in game_state.blocks:
         if block.is_on_grid(game_state.grid_left, game_state.grid_top, 10, 10):
             block.draw(screen, game_state.grid_left, game_state.grid_top)
-    
+
 
     # Show the turn of the current player in the right panel
     font = pygame.font.Font(None, 36)
@@ -501,7 +501,7 @@ def placeBlockedTile(game_state, mouse_x, mouse_y, blocked_tiles):
     # Check that the clicked tile falls within the visible grid (10x10)
     if (tile_x >= grid_offset_x and tile_x < grid_offset_x + 10 and
         tile_y >= grid_offset_y and tile_y < grid_offset_y + 10):
-        
+
         # Check that no blocked tile already exists at this absolute coordinate
         if not any(block.x == tile_x and block.y == tile_y for block in blocked_tiles):
             # Also, prevent placing a block on the angel's position (absolute coordinates)
@@ -549,7 +549,7 @@ def checkWin(game_state):
             candidate_x = ax + dx
             candidate_y = ay + dy
             # Check the candidate is not blocked:
-            blocked = any(block.x == candidate_x and block.y == candidate_y 
+            blocked = any(block.x == candidate_x and block.y == candidate_y
                           for block in game_state.blocks)
             if not blocked:
                 # Found at least one legal move
