@@ -455,16 +455,16 @@ def renderGrid(screen, game_state, grid, current_player, turn_number):
     turn_rect = turn_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 125))
     screen.blit(turn_text, turn_rect)
 
-    coordinates_text = font.render(f"Current Coordinates: ({game_state.grid_left + game_state.GRID_COLS // 2}, {game_state.grid_top + game_state.GRID_ROWS // 2})", True, (0, 0, 0))
-    coordinates_rect = coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 175))
+    coordinates_text = font.render(f"Looking at: ({game_state.grid_left + game_state.GRID_COLS // 2}, {game_state.grid_top + game_state.GRID_ROWS // 2})", True, (0, 0, 0))
+    coordinates_rect = coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 275))
     screen.blit(coordinates_text, coordinates_rect)
 
-    angel_coordinates_text = font.render(f"Angel Coordinates: ({game_state.angel_x}, {game_state.angel_y})", True, (0, 0, 0))
-    angel_coordinates_rect = angel_coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 225))
+    angel_coordinates_text = font.render(f"Angel At: ({game_state.angel_x}, {game_state.angel_y})", True, (0, 0, 0))
+    angel_coordinates_rect = angel_coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 325))
     screen.blit(angel_coordinates_text, angel_coordinates_rect)
 
-    last_block_coordinates_text = font.render(f"Last Block Coordinates: ({game_state.blocks[-1].x if game_state.blocks else 'None'}, {game_state.blocks[-1].y if game_state.blocks else 'None'})", True, (0, 0, 0))
-    last_block_coordinates_rect = last_block_coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 275))
+    last_block_coordinates_text = font.render(f"Last Block: {(game_state.blocks[-1].x,game_state.blocks[-1].y) if game_state.blocks else None}", True, (0, 0, 0))
+    last_block_coordinates_rect = last_block_coordinates_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 375))
     screen.blit(last_block_coordinates_text, last_block_coordinates_rect)
 
 
@@ -477,14 +477,15 @@ def renderGrid(screen, game_state, grid, current_player, turn_number):
     clock.tick(60)
 
 def moveGrid(game_state, key):
-    if key == pygame.K_w:
-        game_state.grid_top -= 1
-    elif key == pygame.K_s:
-        game_state.grid_top += 1
-    elif key == pygame.K_a:
-        game_state.grid_left -= 1
-    elif key == pygame.K_d:
-        game_state.grid_left += 1
+    match key:
+        case pygame.K_w:
+            game_state.grid_top -= 1
+        case pygame.K_a:
+            game_state.grid_left -= 1
+        case pygame.K_s:
+            game_state.grid_top += 1
+        case pygame.K_d:
+            game_state.grid_left += 1
     return game_state
 
 def placeBlockedTile(game_state, mouse_x, mouse_y, blocked_tiles):
