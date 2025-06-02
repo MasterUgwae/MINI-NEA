@@ -1,14 +1,16 @@
 # main.py
 
-# TODO: fix menu looks
-# make the buttons better
-
 import os
 import sys
+import warnings
 
+# Disabling the warning messages associated with pygame
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 
+
+warnings.simplefilter("ignore", DeprecationWarning)
+warnings.simplefilter("ignore", UserWarning)
 
 import pygame
 
@@ -26,14 +28,14 @@ class Clickable:
 class Tile(Clickable):
 
     def __init__(self, x, y, grid_tile_width, grid_tile_height):
-        # x, y are the tiles position on the grid and not the screen
+        # x, y are the tiles position on the grid
         super().__init__(x, y, grid_tile_width, grid_tile_height)
         self.angel_image = pygame.image.load("Images/angel_image.png").convert_alpha()
 
     def draw(self, screen, angel_x, angel_y, angel_power):
-        ## Check if the tile is within the angel's range
-        ## if the tile is within the angel's range, draw it
-        ## Otherwise, draw it as gray
+        # Check if the tile is within the angel's range
+        # if the tile is within the angel's range, draw it
+        # Otherwise, draw it as gray
         rect = pygame.Rect(
             self.x * self.width, self.y * self.height, self.width, self.height
         )
@@ -104,30 +106,38 @@ class Button(Clickable):
         self.text_color = text_color
         self.font_size = font_size
         self.font = pygame.font.Font(None, font_size)
+        self.is_pressed = False
+        self.pressed_offset = 4  # The downward offset when pressed
 
     def draw(self, screen, mouse_pos=None):
-        # Choose color based on hover state.
+        # Determine button color based on hover state.
         color = self.base_color
         if mouse_pos and self.is_hovered(mouse_pos):
             color = self.hover_color
 
-        # Define the button rect (centered on self.x, self.y)
+        # Apply the pressed offset if active.
+        y_offset = self.pressed_offset if self.is_pressed else 0
+
+        # Define the button rectangle (centreed at self.x, self.y)
         rect = pygame.Rect(
-            self.x - self.width // 2, self.y - self.height // 2, self.width, self.height
+            self.x - self.width // 2,
+            self.y - self.height // 2 + y_offset,
+            self.width,
+            self.height,
         )
 
-        # Draw a drop shadow
+        # Draw a drop shadow (slightly offset and darker)
         shadow_rect = rect.copy()
         shadow_rect.x += 3
         shadow_rect.y += 3
-        pygame.draw.rect(screen, (20, 20, 20), shadow_rect, border_radius=8)
+        pygame.draw.rect(screen, (30, 30, 30), shadow_rect, border_radius=8)
 
-        # Draw the main button (with rounded corners)
+        # Draw the button itself (with rounded corners)
         pygame.draw.rect(screen, color, rect, border_radius=8)
 
-        # Render and blit text
+        # Render the button text and centre it.
         text_surface = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surface.get_rect(center=(self.x, self.y))
+        text_rect = text_surface.get_rect(center=(self.x, self.y + y_offset))
         screen.blit(text_surface, text_rect)
 
     def is_hovered(self, mouse_pos):
@@ -139,6 +149,16 @@ class Button(Clickable):
 
     def is_clicked(self, mouse_x, mouse_y):
         return self.is_hovered((mouse_x, mouse_y))
+
+    def animate_press(self, screen):
+        """
+        Sets the is_pressed flag, updates the display briefly, and then resets.
+        This gives a visual effect of the button depressing.
+        """
+        self.is_pressed = True
+        pygame.display.update()
+        pygame.time.delay(100)  # Delay (in milliseconds) to let the user see the press.
+        self.is_pressed = False
 
 
 class Move:
@@ -154,39 +174,33 @@ class Move:
 
 class GameState:
     def __init__(self):
-        # Screen dimensions
-        self.SCREEN_WIDTH = 800
+        # Define new screen dimensions: grid remains 600x600, side panel becomes 300 pixels wide.
+        self.SCREEN_WIDTH = 900
         self.SCREEN_HEIGHT = 600
 
-        # Grid area dimensions (e.g. 600x600 for the grid, leaving 200 for UI)
         self.GRID_AREA_WIDTH = 600
         self.GRID_AREA_HEIGHT = 600
 
-        # Grid settings (10x10 grid)
-        self.GRID_COLS = 10
-        self.GRID_ROWS = 10
+        self.GRID_COLS = 12
+        self.GRID_ROWS = 12
         self.tile_width = self.GRID_AREA_WIDTH // self.GRID_COLS
         self.tile_height = self.GRID_AREA_HEIGHT // self.GRID_ROWS
 
-        # Offsets: these are absolute tile indices for the top-left tile of the grid view.
+        # Offsets for grid view positioning.
         self.grid_left = 0
         self.grid_top = 0
 
-        # Angel's absolute position (tile coordinates) and power
         self.angel_power = 1
         self.angel_x = 0
         self.angel_y = 0
 
-        # List of BlockedTiles (using absolute coordinates)
         self.blocks = []
-
-        # Move stacks for undo/redo; each element is a Move object.
         self.undo_stack = []
         self.redo_stack = []
 
-        # UI buttons for undo and redo (positioned to the right of the grid area)
-        self.undo_button = Button(700, 160, 80, 40, "Undo")
-        self.redo_button = Button(700, 220, 80, 40, "Redo")
+        # UI buttons for undo and redo will be (re)assigned later.
+        self.undo_button = None
+        self.redo_button = None
 
     def add_clock(self, clock):
         self.clock = clock
@@ -218,20 +232,9 @@ def main():
     start = True
     while not end and start:
         start, end = menu(game_state)
-        print("ended menu")
         if start:
             game_state, start, end = gameloop(game_state)
     exitGame()
-
-
-def draw_gradient(screen, start_color, end_color, rect):
-    """Draw a vertical gradient in the given rectangle."""
-    x, y, width, height = rect
-    for i in range(height):
-        r = start_color[0] + (end_color[0] - start_color[0]) * i // height
-        g = start_color[1] + (end_color[1] - start_color[1]) * i // height
-        b = start_color[2] + (end_color[2] - start_color[2]) * i // height
-        pygame.draw.line(screen, (r, g, b), (x, y + i), (x + width, y + i))
 
 
 def startScreen(game_state):
@@ -240,20 +243,20 @@ def startScreen(game_state):
     clock = game_state.clock
     screen = game_state.screen
 
-    # Draw a beautiful gradient background.
+    # Draw a gradient background.
     draw_gradient(
         screen, (30, 30, 80), (10, 10, 40), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
     )
 
-    # Create a stylized title.
+    # Create a stylised title.
     title_font = pygame.font.Font(None, 100)
     title = title_font.render("Angel Problem", True, (250, 250, 250))
     title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
 
-    # Create a refined Start button using the new Button class.
+    # Create Start button
     start_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, 200, 70, "Start")
 
-    # Optionally, present credits in a small unobtrusive font.
+    # Present credits for images used
     credits = pygame.font.Font(None, 16).render(
         "Credits: Iconka & sodiqmahmud46", True, (200, 200, 200)
     )
@@ -298,7 +301,7 @@ def menu(game_state):
     title = title_font.render("Main Menu", True, (250, 250, 250))
     title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4))
 
-    # Create menu buttons with refined styling.
+    # Create menu buttons
     play_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 25, 200, 70, "Play")
     options_button = Button(
         SCREEN_WIDTH // 2,
@@ -355,41 +358,66 @@ def menu(game_state):
     return start, end
 
 
+def draw_gradient(screen, start_color, end_color, rect):
+    """Draw a vertical gradient inside the given rectangle."""
+    x, y, width, height = rect
+    for i in range(height):
+        r = start_color[0] + (end_color[0] - start_color[0]) * i // height
+        g = start_color[1] + (end_color[1] - start_color[1]) * i // height
+        b = start_color[2] + (end_color[2] - start_color[2]) * i // height
+        pygame.draw.line(screen, (r, g, b), (x, y + i), (x + width, y + i))
+
+
 def options(game_state):
-    # Add the option to change the angel's power using up and down buttons
     SCREEN_WIDTH = game_state.SCREEN_WIDTH
     SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
     clock = game_state.clock
     screen = game_state.screen
     angel_power = game_state.angel_power
-    clearScreen(screen, (230, 230, 230))
 
-    title = pygame.font.Font(None, 74).render("Options", True, (0, 0, 0))
-    title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
-    screen.blit(title, title_rect)
-    angel_power_text = pygame.font.Font(None, 36).render(
-        f"Angel Power: {angel_power}", True, (0, 0, 0)
+    # Use a different gradient background.
+    draw_gradient(
+        screen, (60, 60, 120), (20, 20, 40), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
     )
-    angel_power_text_rect = angel_power_text.get_rect(
-        center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+
+    title_font = pygame.font.Font(None, 80)
+    title = title_font.render("Options", True, (250, 250, 250))
+    title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4))
+
+    # Create power control buttons
+    up_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, 200, 70, "Up")
+    down_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 130, 200, 70, "Down")
+    back_button = Button(
+        SCREEN_WIDTH // 2,
+        SCREEN_HEIGHT // 2 + 210,
+        200,
+        70,
+        "Back",
+        base_color=(204, 0, 0),
+        hover_color=(255, 51, 51),
     )
-    screen.blit(angel_power_text, angel_power_text_rect)
-    up_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, 100, 50, "Up")
-    down_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100, 100, 50, "Down")
-    back_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 150, 100, 50, "Back")
+
     loop = True
     while loop:
-        clearScreen(screen, (230, 230, 230))
-        back_button.draw(screen)
-        up_button.draw(screen)
-        down_button.draw(screen)
-        angel_power_text = pygame.font.Font(None, 36).render(
-            f"Angel Power: {angel_power}", True, (0, 0, 0)
+        # Redraw the background each frame.
+        draw_gradient(
+            screen, (60, 60, 120), (20, 20, 40), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
         )
-        angel_power_text_rect = angel_power_text.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        screen.blit(title, title_rect)
+
+        # Display the current angel power.
+        power_text = pygame.font.Font(None, 36).render(
+            f"Angel Power: {angel_power}", True, (250, 250, 250)
         )
-        screen.blit(angel_power_text, angel_power_text_rect)
+        power_text_rect = power_text.get_rect(
+            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 30)
+        )
+        screen.blit(power_text, power_text_rect)
+
+        mouse_pos = pygame.mouse.get_pos()
+        up_button.draw(screen, mouse_pos)
+        down_button.draw(screen, mouse_pos)
+        back_button.draw(screen, mouse_pos)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -397,15 +425,18 @@ def options(game_state):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if up_button.is_clicked(mouse_x, mouse_y):
+                    up_button.animate_press(screen)
                     angel_power += 1
                     game_state.angel_power = angel_power
                 elif down_button.is_clicked(mouse_x, mouse_y):
+                    down_button.animate_press(screen)
                     if angel_power > 1:
                         angel_power -= 1
                         game_state.angel_power = angel_power
                     else:
                         angel_power = 1
                 elif back_button.is_clicked(mouse_x, mouse_y):
+                    back_button.animate_press(screen)
                     loop = False
 
         pygame.display.update()
@@ -413,55 +444,74 @@ def options(game_state):
     return game_state
 
 
-# A helper to center the grid view on a given move.
-def center_grid_on_move(game_state, move_x, move_y):
+# A helper to centre the grid view on a given input
+def centre_grid_on_move(game_state, move_x, move_y):
     half_cols = game_state.GRID_COLS // 2
     half_rows = game_state.GRID_ROWS // 2
     game_state.grid_left = move_x - half_cols
     game_state.grid_top = move_y - half_rows
 
 
-# In your gameloop, you can directly record moves and update state.
 def gameloop(game_state):
     SCREEN_WIDTH = game_state.SCREEN_WIDTH
     SCREEN_HEIGHT = game_state.SCREEN_HEIGHT
     clock = game_state.clock
     screen = game_state.screen
-    grid_width = (
-        game_state.tile_width
-    )  # using tile_width now derived from the grid area.
+    grid_width = game_state.tile_width
     grid_height = game_state.tile_height
     current_player = "Angel"
     turn_number = 1
+
     grid = [
         [Tile(i, j, grid_width, grid_height) for j in range(game_state.GRID_ROWS)]
         for i in range(game_state.GRID_COLS)
-    ]  # 10x10 grid as before
+    ]
 
-    menu_button = Button(700, 650, 80, 40, "Menu")
-    exit_button = Button(700, 700, 80, 40, "Quit")
-    angel_button = Button(700, 500, 140, 40, "Goto Angel")
-    block_button = Button(700, 550, 140, 40, "Goto Block")
+    # Compute side panel width and its centre x coordinate.
+    side_panel_width = SCREEN_WIDTH - game_state.GRID_AREA_WIDTH
+    ui_centre_x = game_state.GRID_AREA_WIDTH + side_panel_width // 2
+    ui_left_x = game_state.GRID_AREA_WIDTH + side_panel_width // 4
+    ui_right_x = game_state.GRID_AREA_WIDTH + (3 * side_panel_width) // 4
+
+    # Position control buttons in the side panel.
+    undo_button = Button(ui_left_x, 350, 120, 50, "Undo")
+    redo_button = Button(ui_right_x, 350, 120, 50, "Redo")
+    angel_button = Button(ui_left_x, 450, 120, 70, "Goto Angel")
+    block_button = Button(ui_right_x, 450, 120, 70, "Goto Block")
+    menu_button = Button(ui_left_x, 550, 120, 70, "Menu", base_color=(100, 100, 100))
+    exit_button = Button(
+        ui_right_x,
+        550,
+        120,
+        70,
+        "Quit",
+        base_color=(204, 0, 0),
+        hover_color=(255, 51, 51),
+    )
+
+    # Update the references in game_state
+    game_state.undo_button = undo_button
+    game_state.redo_button = redo_button
 
     win = False
     while not win:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return game_state, False, True
-
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
-                # Check if click is in the UI panel
+                # Check if click is in the side UI panel
                 if mouse_x > game_state.GRID_AREA_WIDTH:
-                    # UI area for undo/redo
-                    if game_state.undo_button.is_clicked(mouse_x, mouse_y):
+                    if undo_button.is_clicked(mouse_x, mouse_y):
+                        undo_button.animate_press(screen)
                         game_state = undoMove(game_state)
                         if game_state.undo_stack:
                             current_player = (
                                 "Angel" if turn_number % 2 == 0 else "Devil"
                             )
                             turn_number -= 1
-                    elif game_state.redo_button.is_clicked(mouse_x, mouse_y):
+                    elif redo_button.is_clicked(mouse_x, mouse_y):
+                        redo_button.animate_press(screen)
                         game_state = redoMove(game_state)
                         if game_state.redo_stack:
                             current_player = (
@@ -469,70 +519,57 @@ def gameloop(game_state):
                             )
                             turn_number += 1
                     elif menu_button.is_clicked(mouse_x, mouse_y):
+                        menu_button.animate_press(screen)
                         game_state = GameState()
                         game_state.add_clock(clock)
                         game_state.add_screen(screen)
                         return game_state, True, False
                     elif exit_button.is_clicked(mouse_x, mouse_y):
+                        exit_button.animate_press(screen)
                         return game_state, False, True
-
                     elif angel_button.is_clicked(mouse_x, mouse_y):
+                        angel_button.animate_press(screen)
                         game_state.grid_left = (
-                            game_state.angel_x - game_state.GRID_ROWS // 2
+                            game_state.angel_x - game_state.GRID_COLS // 2
                         )
                         game_state.grid_top = (
-                            game_state.angel_y - game_state.GRID_COLS // 2
+                            game_state.angel_y - game_state.GRID_ROWS // 2
                         )
                     elif block_button.is_clicked(mouse_x, mouse_y):
-                        if game_state.blocks != []:
+                        block_button.animate_press(screen)
+                        if game_state.blocks:
                             game_state.grid_left = (
-                                game_state.blocks[-1].x - game_state.GRID_ROWS // 2
-                                if game_state.blocks[-1]
-                                else game_state.grid_left
+                                game_state.blocks[-1].x - game_state.GRID_COLS // 2
                             )
                             game_state.grid_top = (
-                                game_state.blocks[-1].y - game_state.GRID_COLS // 2
-                                if game_state.blocks[-1]
-                                else game_state.grid_top
+                                game_state.blocks[-1].y - game_state.GRID_ROWS // 2
                             )
-
                 else:
-                    # Process grid clicks (angel move or block placement).
+                    # Process grid clicks for Angel and Devil moves.
                     if current_player == "Angel":
-                        # Convert click (in pixels) into an absolute tile coordinate.
                         tile_x = (mouse_x // grid_width) + game_state.grid_left
                         tile_y = (mouse_y // grid_height) + game_state.grid_top
-                        print("clicked (abs):", tile_x, tile_y)
-                        print("angel at:", game_state.angel_x, game_state.angel_y)
-                        # use checkLegalMove with appropriate coordinate conversion.
                         if checkLegalMove(
                             game_state,
                             tile_x - game_state.grid_left,
                             tile_y - game_state.grid_top,
                         ):
-                            # Record the angel move.
                             move = Move("angel", tile_x, tile_y)
                             game_state.undo_stack.append(move)
                             game_state.redo_stack.clear()
-
-                            # Update angel's state.
                             game_state.angel_x = tile_x
                             game_state.angel_y = tile_y
                             current_player = "Devil"
                             turn_number += 1
                     elif current_player == "Devil":
-                        # For block placement, convert click coordinates:
                         tile_x = (mouse_x // grid_width) + game_state.grid_left
                         tile_y = (mouse_y // grid_height) + game_state.grid_top
-
-                        # Check that tile is available and within the grid.
                         if (
                             tile_x >= game_state.grid_left
                             and tile_x < game_state.grid_left + game_state.GRID_COLS
                             and tile_y >= game_state.grid_top
                             and tile_y < game_state.grid_top + game_state.GRID_ROWS
                         ):
-                            # Prevent duplicate block placements and block if angel is here.
                             if not any(
                                 b.x == tile_x and b.y == tile_y
                                 for b in game_state.blocks
@@ -546,13 +583,11 @@ def gameloop(game_state):
                                 move = Move("block", tile_x, tile_y)
                                 game_state.undo_stack.append(move)
                                 game_state.redo_stack.clear()
-
                                 game_state.blocks.append(new_block)
                                 current_player = "Angel"
                                 turn_number += 1
                                 if checkWin(game_state):
                                     win = True
-
             if event.type == pygame.KEYDOWN:
                 if event.key in [
                     pygame.K_w,
@@ -577,7 +612,8 @@ def gameloop(game_state):
             angel_button,
             block_button,
         )
-    # display the win screen and return to the menu
+
+    # Display win screen for the Devil
     while True:
         clearScreen(screen, (200, 0, 0))
         font = pygame.font.Font(None, 74)
@@ -586,31 +622,34 @@ def gameloop(game_state):
             center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100)
         )
         screen.blit(win_text, win_rect)
-        # Add a button to go back to the menu
         back_button = Button(
-            SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, 100, 50, "Menu"
+            SCREEN_WIDTH // 2,
+            SCREEN_HEIGHT // 2 + 50,
+            200,
+            70,
+            "Menu",
+            base_color=(100, 100, 100),
         )
-        back_button.draw(screen)
+        back_button.draw(screen, pygame.mouse.get_pos())
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return game_state, False, True
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if back_button.is_clicked(mouse_x, mouse_y):
-                    # Reset game state for the next round
+                    back_button.animate_press(screen)
                     game_state = GameState()
                     game_state.add_screen(screen)
                     game_state.add_clock(clock)
                     return game_state, True, False
-
         pygame.display.update()
         clock.tick(60)
 
 
-# The undoMove function is where we now center the grid.
+# The undoMove function undoes the last move
+# and centres the grid
 def undoMove(game_state):
     if not game_state.undo_stack:
-        print("Nothing to undo.")
         return game_state
 
     move = game_state.undo_stack.pop()
@@ -625,14 +664,14 @@ def undoMove(game_state):
         if last_angel_move:
             game_state.angel_x = last_angel_move.tile_x
             game_state.angel_y = last_angel_move.tile_y
-            center_grid_on_move(
+            centre_grid_on_move(
                 game_state, last_angel_move.tile_x, last_angel_move.tile_y
             )
         else:
             # Default state if no previous angel move.
             game_state.angel_x = 0
             game_state.angel_y = 0
-            center_grid_on_move(game_state, 0, 0)
+            centre_grid_on_move(game_state, 0, 0)
     elif move.move_type == "block":
         # Remove the block that matches this move.
         game_state.blocks = [
@@ -640,10 +679,10 @@ def undoMove(game_state):
             for b in game_state.blocks
             if not (b.x == move.tile_x and b.y == move.tile_y)
         ]
-        # Center on the most recent move in the undo stack.
+        # centre on the most recent move in the undo stack.
         if game_state.undo_stack:
             last = game_state.undo_stack[-1]
-            center_grid_on_move(game_state, last.tile_x, last.tile_y)
+            centre_grid_on_move(game_state, last.tile_x, last.tile_y)
 
     game_state.redo_stack.append(move)
     return game_state
@@ -651,7 +690,6 @@ def undoMove(game_state):
 
 def redoMove(game_state):
     if not game_state.redo_stack:
-        print("Nothing to redo.")
         return game_state
 
     move = game_state.redo_stack.pop()
@@ -659,13 +697,13 @@ def redoMove(game_state):
     if move.move_type == "angel":
         game_state.angel_x = move.tile_x
         game_state.angel_y = move.tile_y
-        center_grid_on_move(game_state, move.tile_x, move.tile_y)
+        centre_grid_on_move(game_state, move.tile_x, move.tile_y)
     elif move.move_type == "block":
         new_block = BlockedTile(
             move.tile_x, move.tile_y, game_state.tile_width, game_state.tile_height
         )
         game_state.blocks.append(new_block)
-        center_grid_on_move(game_state, move.tile_x, move.tile_y)
+        centre_grid_on_move(game_state, move.tile_x, move.tile_y)
 
     game_state.undo_stack.append(move)
     return game_state
@@ -683,17 +721,16 @@ def renderGrid(
     block_button,
 ):
     clock = game_state.clock
-    screen.fill((255, 255, 255))
-    # Calculate visible angel coordinates based on the current grid offset:
+    clearScreen(screen, (243, 243, 243))
+
+    # Draw the grid.
     visible_angel_x = game_state.angel_x - game_state.grid_left
     visible_angel_y = game_state.angel_y - game_state.grid_top
-
     for i in range(game_state.GRID_ROWS):
         for j in range(game_state.GRID_COLS):
             grid[i][j].draw(
                 screen, visible_angel_x, visible_angel_y, game_state.angel_power
             )
-
     for block in game_state.blocks:
         if block.is_on_grid(
             game_state.grid_left,
@@ -703,25 +740,29 @@ def renderGrid(
         ):
             block.draw(screen, game_state.grid_left, game_state.grid_top)
 
-    # Show the turn of the current player in the right panel
-    font = pygame.font.Font(None, 30)
+    side_panel_width = game_state.SCREEN_WIDTH - game_state.GRID_AREA_WIDTH
+    ui_centre_x = game_state.GRID_AREA_WIDTH + side_panel_width // 2
 
-    if current_player == "Angel":
-        player_text = font.render("Current Player:", True, (123, 242, 242))
-    else:
-        player_text = font.render("Current Player:", True, (255, 0, 0))
-    player_rect = player_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 50))
+    # Draw the turn and status information in the side panel.
+    font = pygame.font.Font(None, 36)
+    player_text = font.render(
+        "Current Player:",
+        True,
+        (123, 242, 242) if current_player == "Angel" else (255, 0, 0),
+    )
+    player_rect = player_text.get_rect(center=(ui_centre_x, 20))
     screen.blit(player_text, player_rect)
 
-    if current_player == "Angel":
-        player_text = font.render("Angel", True, (123, 242, 242))
-    else:
-        player_text = font.render("Devil", True, (255, 0, 0))
-    player_rect = player_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 75))
-    screen.blit(player_text, player_rect)
+    player_name = font.render(
+        "Angel" if current_player == "Angel" else "Devil",
+        True,
+        (123, 242, 242) if current_player == "Angel" else (255, 0, 0),
+    )
+    name_rect = player_name.get_rect(center=(ui_centre_x, 50))
+    screen.blit(player_name, name_rect)
 
     turn_text = font.render(f"Turn: {turn_number}", True, (0, 0, 0))
-    turn_rect = turn_text.get_rect(center=(game_state.GRID_AREA_WIDTH + 100, 125))
+    turn_rect = turn_text.get_rect(center=(ui_centre_x, 90))
     screen.blit(turn_text, turn_rect)
 
     coordinates_text = font.render(
@@ -729,37 +770,30 @@ def renderGrid(
         True,
         (0, 0, 0),
     )
-    coordinates_rect = coordinates_text.get_rect(
-        center=(game_state.GRID_AREA_WIDTH + 100, 275)
-    )
+    coordinates_rect = coordinates_text.get_rect(center=(ui_centre_x, 140))
     screen.blit(coordinates_text, coordinates_rect)
 
     angel_coordinates_text = font.render(
         f"Angel At: ({game_state.angel_x}, {game_state.angel_y})", True, (0, 0, 0)
     )
-    angel_coordinates_rect = angel_coordinates_text.get_rect(
-        center=(game_state.GRID_AREA_WIDTH + 100, 325)
-    )
-    screen.blit(angel_coordinates_text, angel_coordinates_rect)
+    angel_rect = angel_coordinates_text.get_rect(center=(ui_centre_x, 180))
+    screen.blit(angel_coordinates_text, angel_rect)
 
-    last_block_coordinates_text = font.render(
-        f"Last Block: {(game_state.blocks[-1].x,game_state.blocks[-1].y) if game_state.blocks else None}",
+    last_block_text = font.render(
+        f"Last Block: {(game_state.blocks[-1].x, game_state.blocks[-1].y) if game_state.blocks else 'None'}",
         True,
         (0, 0, 0),
     )
-    last_block_coordinates_rect = last_block_coordinates_text.get_rect(
-        center=(game_state.GRID_AREA_WIDTH + 100, 375)
-    )
-    screen.blit(last_block_coordinates_text, last_block_coordinates_rect)
+    block_rect = last_block_text.get_rect(center=(ui_centre_x, 220))
+    screen.blit(last_block_text, block_rect)
 
-    # Draw the undo and redo buttons
-    game_state.undo_button.draw(screen)
-    game_state.redo_button.draw(screen)
-
-    menu_button.draw(screen)
-    exit_button.draw(screen)
-    angel_button.draw(screen)
-    block_button.draw(screen)
+    # Draw all UI buttons (they already contain hover/press info).
+    game_state.undo_button.draw(screen, pygame.mouse.get_pos())
+    game_state.redo_button.draw(screen, pygame.mouse.get_pos())
+    menu_button.draw(screen, pygame.mouse.get_pos())
+    exit_button.draw(screen, pygame.mouse.get_pos())
+    angel_button.draw(screen, pygame.mouse.get_pos())
+    block_button.draw(screen, pygame.mouse.get_pos())
 
     pygame.display.update()
     clock.tick(60)
@@ -788,7 +822,7 @@ def placeBlockedTile(game_state, mouse_x, mouse_y, blocked_tiles):
     tile_x = (mouse_x // grid_width) + grid_offset_x
     tile_y = (mouse_y // grid_height) + grid_offset_y
 
-    # Check that the clicked tile falls within the visible grid (10x10)
+    # Check that the clicked tile falls within the visible grid
     if (
         tile_x >= grid_offset_x
         and tile_x < grid_offset_x + game_state.GRID_ROWS
@@ -833,7 +867,6 @@ def checkLegalMove(game_state, tile_x, tile_y):
         and clicked_abs_y >= angel_abs_y - game_state.angel_power
         and clicked_abs_y <= angel_abs_y + game_state.angel_power
     ):
-        print("legal move")
         return True
 
     return False
@@ -863,7 +896,6 @@ def checkWin(game_state):
                 return False
 
     # If every candidate move is blocked, the angel is trapped.
-    print("Angel is trapped! Devil wins!")
     return True
 
 
