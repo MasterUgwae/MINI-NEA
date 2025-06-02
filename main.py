@@ -9,6 +9,9 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 
 
+
+
+
 warnings.simplefilter("ignore", DeprecationWarning)
 warnings.simplefilter("ignore", UserWarning)
 
@@ -16,6 +19,9 @@ import pygame
 
 
 class Clickable:
+
+
+
 
 
     def __init__(self, x, y, width, height):
@@ -463,8 +469,8 @@ def gameloop(game_state):
     turn_number = 1
 
     grid = [
-        [Tile(i, j, grid_width, grid_height) for j in range(game_state.GRID_ROWS)]
-        for i in range(game_state.GRID_COLS)
+        [Tile(row, col, grid_width, grid_height) for col in range(game_state.GRID_ROWS)]
+        for row in range(game_state.GRID_COLS)
     ]
 
     # Compute side panel width and its centre x coordinate.
@@ -726,9 +732,9 @@ def renderGrid(
     # Draw the grid.
     visible_angel_x = game_state.angel_x - game_state.grid_left
     visible_angel_y = game_state.angel_y - game_state.grid_top
-    for i in range(game_state.GRID_ROWS):
-        for j in range(game_state.GRID_COLS):
-            grid[i][j].draw(
+    for row in range(game_state.GRID_ROWS):
+        for col in range(game_state.GRID_COLS):
+            grid[row][col].draw(
                 screen, visible_angel_x, visible_angel_y, game_state.angel_power
             )
     for block in game_state.blocks:
