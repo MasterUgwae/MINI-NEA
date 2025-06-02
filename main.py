@@ -10,8 +10,6 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 
 
-
-
 warnings.simplefilter("ignore", DeprecationWarning)
 warnings.simplefilter("ignore", UserWarning)
 
@@ -19,8 +17,6 @@ import pygame
 
 
 class Clickable:
-
-
 
 
 
@@ -36,7 +32,13 @@ class Tile(Clickable):
     def __init__(self, x, y, grid_tile_width, grid_tile_height):
         # x, y are the tiles position on the grid
         super().__init__(x, y, grid_tile_width, grid_tile_height)
-        self.angel_image = pygame.image.load("Images/angel_image.png").convert_alpha()
+        try:
+            self.angel_image = pygame.image.load(
+                "Images/angel_image.png"
+            ).convert_alpha()
+        except FileNotFoundError:
+            self.angel_image = pygame.Surface((512, 512))
+            self.angel_image.fill((255, 255, 0))
 
     def draw(self, screen, angel_x, angel_y, angel_power):
         # Check if the tile is within the angel's range
@@ -114,8 +116,17 @@ class Button(Clickable):
         self.font = pygame.font.Font(None, font_size)
         self.is_pressed = False
         self.pressed_offset = 4  # The downward offset when pressed
+        self.press_start_time = 0  # Track when the button was pressed
+        self.press_duration = 100  # Duration in milliseconds
 
     def draw(self, screen, mouse_pos=None):
+        # Check if we should stop showing the pressed state
+        if (
+            self.is_pressed
+            and pygame.time.get_ticks() - self.press_start_time > self.press_duration
+        ):
+            self.is_pressed = False
+
         # Determine button color based on hover state.
         color = self.base_color
         if mouse_pos and self.is_hovered(mouse_pos):
@@ -123,20 +134,21 @@ class Button(Clickable):
 
         # Apply the pressed offset if active.
         y_offset = self.pressed_offset if self.is_pressed else 0
+        x_offset = self.pressed_offset if self.is_pressed else 0
 
-        # Define the button rectangle (centreed at self.x, self.y)
+        # Define the button rectangle (centred at self.x, self.y)
         rect = pygame.Rect(
-            self.x - self.width // 2,
+            self.x - self.width // 2 + x_offset,
             self.y - self.height // 2 + y_offset,
             self.width,
             self.height,
         )
-
-        # Draw a drop shadow (slightly offset and darker)
-        shadow_rect = rect.copy()
-        shadow_rect.x += 3
-        shadow_rect.y += 3
-        pygame.draw.rect(screen, (30, 30, 30), shadow_rect, border_radius=8)
+        if not self.is_pressed:
+            # Draw a drop shadow (slightly offset and darker)
+            shadow_rect = rect.copy()
+            shadow_rect.x += 3
+            shadow_rect.y += 3
+            pygame.draw.rect(screen, (30, 30, 30), shadow_rect, border_radius=8)
 
         # Draw the button itself (with rounded corners)
         pygame.draw.rect(screen, color, rect, border_radius=8)
@@ -156,15 +168,13 @@ class Button(Clickable):
     def is_clicked(self, mouse_x, mouse_y):
         return self.is_hovered((mouse_x, mouse_y))
 
-    def animate_press(self, screen):
+    def animate_press(self):
         """
-        Sets the is_pressed flag, updates the display briefly, and then resets.
-        This gives a visual effect of the button depressing.
+        Sets the is_pressed flag and records the time. The draw method will
+        handle resetting the flag after the duration expires.
         """
         self.is_pressed = True
-        pygame.display.update()
-        pygame.time.delay(100)  # Delay (in milliseconds) to let the user see the press.
-        self.is_pressed = False
+        self.press_start_time = pygame.time.get_ticks()
 
 
 class Move:
@@ -431,18 +441,18 @@ def options(game_state):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if up_button.is_clicked(mouse_x, mouse_y):
-                    up_button.animate_press(screen)
+                    up_button.animate_press()
                     angel_power += 1
                     game_state.angel_power = angel_power
                 elif down_button.is_clicked(mouse_x, mouse_y):
-                    down_button.animate_press(screen)
+                    down_button.animate_press()
                     if angel_power > 1:
                         angel_power -= 1
                         game_state.angel_power = angel_power
                     else:
                         angel_power = 1
                 elif back_button.is_clicked(mouse_x, mouse_y):
-                    back_button.animate_press(screen)
+                    back_button.animate_press()
                     loop = False
 
         pygame.display.update()
@@ -456,6 +466,39 @@ def centre_grid_on_move(game_state, move_x, move_y):
     half_rows = game_state.GRID_ROWS // 2
     game_state.grid_left = move_x - half_cols
     game_state.grid_top = move_y - half_rows
+
+
+def placeBlockedTile(game_state, mouse_x, mouse_y):
+    """
+    Restored placeBlockedTile function that creates a new blocked tile
+    at the clicked location if it's valid.
+    Returns the updated game_state and whether a tile was placed.
+    """
+    grid_width = game_state.tile_width
+    grid_height = game_state.tile_height
+
+    # Convert pixel click to an absolute tile coordinate
+    tile_x = (mouse_x // grid_width) + game_state.grid_left
+    tile_y = (mouse_y // grid_height) + game_state.grid_top
+
+    # Check that the clicked tile falls within the visible grid
+    if (
+        tile_x >= game_state.grid_left
+        and tile_x < game_state.grid_left + game_state.GRID_COLS
+        and tile_y >= game_state.grid_top
+        and tile_y < game_state.grid_top + game_state.GRID_ROWS
+    ):
+        # Check that no blocked tile already exists at this absolute coordinate
+        if not any(
+            block.x == tile_x and block.y == tile_y for block in game_state.blocks
+        ):
+            # Also, prevent placing a block on the angel's position (absolute coordinates)
+            if not (tile_x == game_state.angel_x and tile_y == game_state.angel_y):
+                new_block = BlockedTile(tile_x, tile_y, grid_width, grid_height)
+                game_state.blocks.append(new_block)
+                return game_state, True, tile_x, tile_y
+
+    return game_state, False, None, None
 
 
 def gameloop(game_state):
@@ -475,16 +518,17 @@ def gameloop(game_state):
 
     # Compute side panel width and its centre x coordinate.
     side_panel_width = SCREEN_WIDTH - game_state.GRID_AREA_WIDTH
-    ui_centre_x = game_state.GRID_AREA_WIDTH + side_panel_width // 2
     ui_left_x = game_state.GRID_AREA_WIDTH + side_panel_width // 4
     ui_right_x = game_state.GRID_AREA_WIDTH + (3 * side_panel_width) // 4
 
     # Position control buttons in the side panel.
-    undo_button = Button(ui_left_x, 350, 120, 50, "Undo")
-    redo_button = Button(ui_right_x, 350, 120, 50, "Redo")
-    angel_button = Button(ui_left_x, 450, 120, 70, "Goto Angel")
-    block_button = Button(ui_right_x, 450, 120, 70, "Goto Block")
-    menu_button = Button(ui_left_x, 550, 120, 70, "Menu", base_color=(100, 100, 100))
+    undo_button = Button(ui_left_x, 350, 120, 50, "Undo", font_size=30)
+    redo_button = Button(ui_right_x, 350, 120, 50, "Redo", font_size=30)
+    angel_button = Button(ui_left_x, 450, 120, 70, "Goto Angel", font_size=30)
+    block_button = Button(ui_right_x, 450, 120, 70, "Goto Block", font_size=30)
+    menu_button = Button(
+        ui_left_x, 550, 120, 70, "Menu", base_color=(100, 100, 100), font_size=30
+    )
     exit_button = Button(
         ui_right_x,
         550,
@@ -493,6 +537,7 @@ def gameloop(game_state):
         "Quit",
         base_color=(204, 0, 0),
         hover_color=(255, 51, 51),
+        font_size=30,
     )
 
     # Update the references in game_state
@@ -509,7 +554,7 @@ def gameloop(game_state):
                 # Check if click is in the side UI panel
                 if mouse_x > game_state.GRID_AREA_WIDTH:
                     if undo_button.is_clicked(mouse_x, mouse_y):
-                        undo_button.animate_press(screen)
+                        undo_button.animate_press()
                         game_state = undoMove(game_state)
                         if game_state.undo_stack:
                             current_player = (
@@ -517,7 +562,7 @@ def gameloop(game_state):
                             )
                             turn_number -= 1
                     elif redo_button.is_clicked(mouse_x, mouse_y):
-                        redo_button.animate_press(screen)
+                        redo_button.animate_press()
                         game_state = redoMove(game_state)
                         if game_state.redo_stack:
                             current_player = (
@@ -525,16 +570,16 @@ def gameloop(game_state):
                             )
                             turn_number += 1
                     elif menu_button.is_clicked(mouse_x, mouse_y):
-                        menu_button.animate_press(screen)
+                        menu_button.animate_press()
                         game_state = GameState()
                         game_state.add_clock(clock)
                         game_state.add_screen(screen)
                         return game_state, True, False
                     elif exit_button.is_clicked(mouse_x, mouse_y):
-                        exit_button.animate_press(screen)
+                        exit_button.animate_press()
                         return game_state, False, True
                     elif angel_button.is_clicked(mouse_x, mouse_y):
-                        angel_button.animate_press(screen)
+                        angel_button.animate_press()
                         game_state.grid_left = (
                             game_state.angel_x - game_state.GRID_COLS // 2
                         )
@@ -542,7 +587,7 @@ def gameloop(game_state):
                             game_state.angel_y - game_state.GRID_ROWS // 2
                         )
                     elif block_button.is_clicked(mouse_x, mouse_y):
-                        block_button.animate_press(screen)
+                        block_button.animate_press()
                         if game_state.blocks:
                             game_state.grid_left = (
                                 game_state.blocks[-1].x - game_state.GRID_COLS // 2
@@ -568,32 +613,18 @@ def gameloop(game_state):
                             current_player = "Devil"
                             turn_number += 1
                     elif current_player == "Devil":
-                        tile_x = (mouse_x // grid_width) + game_state.grid_left
-                        tile_y = (mouse_y // grid_height) + game_state.grid_top
-                        if (
-                            tile_x >= game_state.grid_left
-                            and tile_x < game_state.grid_left + game_state.GRID_COLS
-                            and tile_y >= game_state.grid_top
-                            and tile_y < game_state.grid_top + game_state.GRID_ROWS
-                        ):
-                            if not any(
-                                b.x == tile_x and b.y == tile_y
-                                for b in game_state.blocks
-                            ) and not (
-                                tile_x == game_state.angel_x
-                                and tile_y == game_state.angel_y
-                            ):
-                                new_block = BlockedTile(
-                                    tile_x, tile_y, grid_width, grid_height
-                                )
-                                move = Move("block", tile_x, tile_y)
-                                game_state.undo_stack.append(move)
-                                game_state.redo_stack.clear()
-                                game_state.blocks.append(new_block)
-                                current_player = "Angel"
-                                turn_number += 1
-                                if checkWin(game_state):
-                                    win = True
+                        # Use the restored placeBlockedTile function
+                        game_state, tile_placed, tile_x, tile_y = placeBlockedTile(
+                            game_state, mouse_x, mouse_y
+                        )
+                        if tile_placed:
+                            move = Move("block", tile_x, tile_y)
+                            game_state.undo_stack.append(move)
+                            game_state.redo_stack.clear()
+                            current_player = "Angel"
+                            turn_number += 1
+                            if checkWin(game_state):
+                                win = True
             if event.type == pygame.KEYDOWN:
                 if event.key in [
                     pygame.K_w,
@@ -643,7 +674,7 @@ def gameloop(game_state):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if back_button.is_clicked(mouse_x, mouse_y):
-                    back_button.animate_press(screen)
+                    back_button.animate_press()
                     game_state = GameState()
                     game_state.add_screen(screen)
                     game_state.add_clock(clock)
@@ -816,34 +847,6 @@ def moveGrid(game_state, key):
         case pygame.K_d | pygame.K_RIGHT:
             game_state.grid_left += 1
     return game_state
-
-
-def placeBlockedTile(game_state, mouse_x, mouse_y, blocked_tiles):
-    grid_width = game_state.GRID_WIDTH
-    grid_height = game_state.GRID_HEIGHT
-    grid_offset_x = game_state.grid_left  # these are tile indices
-    grid_offset_y = game_state.grid_top
-
-    # Convert pixel click to an absolute tile coordinate
-    tile_x = (mouse_x // grid_width) + grid_offset_x
-    tile_y = (mouse_y // grid_height) + grid_offset_y
-
-    # Check that the clicked tile falls within the visible grid
-    if (
-        tile_x >= grid_offset_x
-        and tile_x < grid_offset_x + game_state.GRID_ROWS
-        and tile_y >= grid_offset_y
-        and tile_y < grid_offset_y + game_state.GRID_COLS
-    ):
-
-        # Check that no blocked tile already exists at this absolute coordinate
-        if not any(block.x == tile_x and block.y == tile_y for block in blocked_tiles):
-            # Also, prevent placing a block on the angel's position (absolute coordinates)
-            if not (tile_x == game_state.angel_x and tile_y == game_state.angel_y):
-                new_block = BlockedTile(tile_x, tile_y, grid_width, grid_height)
-                blocked_tiles.append(new_block)
-                game_state.add_block(new_block)
-    return game_state, blocked_tiles
 
 
 def checkLegalMove(game_state, tile_x, tile_y):
