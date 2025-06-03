@@ -1,12 +1,16 @@
 # main.py
 
+# TODO: Shortcut for undo/redo
+# comments
+# try except
+
+
 import os
 import sys
 import warnings
 
 # Disabling the warning messages associated with pygame
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-
 
 
 
