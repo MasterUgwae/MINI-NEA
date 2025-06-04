@@ -1,28 +1,19 @@
 # main.py
 
-# TODO: Shortcut for undo/redo
-# comments
-# try except
-
+# TODO: comments
 
 import os
-import sys
 import warnings
+import sys
 
 # Disabling the warning messages associated with pygame
-os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-
-
-
 warnings.simplefilter("ignore", DeprecationWarning)
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 warnings.simplefilter("ignore", UserWarning)
 
 import pygame
 
-
 class Clickable:
-
-
 
     def __init__(self, x, y, width, height):
         self.x = x
@@ -106,10 +97,7 @@ class Button(Clickable):
         width,
         height,
         text,
-        base_color=(0, 153, 204),
-        hover_color=(0, 204, 255),
-        text_color=(255, 255, 255),
-        font_size=36,
+        base_color=(0, 153, 204),        hover_color=(0, 204, 255),        text_color=(255, 255, 255),        font_size=36,
     ):
         super().__init__(x, y, width, height)
         self.text = text
@@ -237,8 +225,11 @@ def main():
     pygame.init()
     pygame.font.init()
     pygame.display.set_caption("Angel Problem")
-    icon = pygame.image.load("Images/angel_icon.png")
-    pygame.display.set_icon(icon)
+    try:
+        icon = pygame.image.load("Images/angel_icon.png")
+        pygame.display.set_icon(icon)
+    except:
+        pass
     game_state = GameState()
     screen = pygame.display.set_mode(
         (game_state.SCREEN_WIDTH, game_state.SCREEN_HEIGHT)
@@ -412,7 +403,7 @@ def options(game_state):
         SCREEN_HEIGHT // 2 + 210,
         200,
         70,
-        "Back",
+        "Save",
         base_color=(204, 0, 0),
         hover_color=(255, 51, 51),
     )
@@ -559,20 +550,21 @@ def gameloop(game_state):
                 if mouse_x > game_state.GRID_AREA_WIDTH:
                     if undo_button.is_clicked(mouse_x, mouse_y):
                         undo_button.animate_press()
-                        game_state = undoMove(game_state)
                         if game_state.undo_stack:
                             current_player = (
                                 "Angel" if turn_number % 2 == 0 else "Devil"
                             )
                             turn_number -= 1
+                        game_state = undoMove(game_state)
+
                     elif redo_button.is_clicked(mouse_x, mouse_y):
                         redo_button.animate_press()
-                        game_state = redoMove(game_state)
                         if game_state.redo_stack:
                             current_player = (
                                 "Angel" if turn_number % 2 == 0 else "Devil"
                             )
                             turn_number += 1
+                        game_state = redoMove(game_state)
                     elif menu_button.is_clicked(mouse_x, mouse_y):
                         menu_button.animate_press()
                         game_state = GameState()
@@ -641,6 +633,16 @@ def gameloop(game_state):
                     pygame.K_DOWN,
                 ]:
                     game_state = moveGrid(game_state, event.key)
+                elif event.key == pygame.K_u:
+                    if game_state.undo_stack:
+                        current_player = "Angel" if turn_number % 2 == 0 else "Devil"
+                        turn_number -= 1
+                    game_state = undoMove(game_state)
+                elif event.key == pygame.K_r:
+                    if game_state.redo_stack:
+                        current_player = "Angel" if turn_number % 2 == 0 else "Devil"
+                        turn_number += 1
+                    game_state = redoMove(game_state)
 
         renderGrid(
             screen,
