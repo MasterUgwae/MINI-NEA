@@ -1,6 +1,7 @@
 # main.py
 
 # TODO: comments
+# Zoom in/out
 
 import os
 import warnings
@@ -12,6 +13,7 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 warnings.simplefilter("ignore", UserWarning)
 
 import pygame
+
 
 class Clickable:
 
@@ -97,7 +99,10 @@ class Button(Clickable):
         width,
         height,
         text,
-        base_color=(0, 153, 204),        hover_color=(0, 204, 255),        text_color=(255, 255, 255),        font_size=36,
+        base_color=(0, 153, 204),
+        hover_color=(0, 204, 255),
+        text_color=(255, 255, 255),
+        font_size=36,
     ):
         super().__init__(x, y, width, height)
         self.text = text
@@ -105,7 +110,7 @@ class Button(Clickable):
         self.hover_color = hover_color
         self.text_color = text_color
         self.font_size = font_size
-        self.font = pygame.font.Font(None, font_size)
+        self.font = pygame.font.Font(r"Font/Nunito-Black.ttf", font_size)
         self.is_pressed = False
         self.pressed_offset = 4  # The downward offset when pressed
         self.press_start_time = 0  # Track when the button was pressed
@@ -260,7 +265,7 @@ def startScreen(game_state):
     )
 
     # Create a stylised title.
-    title_font = pygame.font.Font(None, 100)
+    title_font = pygame.font.Font(r"Font/Nunito-Black.ttf", 100)
     title = title_font.render("Angel Problem", True, (250, 250, 250))
     title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
 
@@ -268,7 +273,7 @@ def startScreen(game_state):
     start_button = Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, 200, 70, "Start")
 
     # Present credits for images used
-    credits = pygame.font.Font(None, 16).render(
+    credits = pygame.font.Font(r"Font/Nunito-Black.ttf", 16).render(
         "Credits: Iconka & sodiqmahmud46", True, (200, 200, 200)
     )
     credits_rect = credits.get_rect(bottomright=(SCREEN_WIDTH - 10, SCREEN_HEIGHT - 10))
@@ -308,7 +313,7 @@ def menu(game_state):
     )
 
     # Create a title for the menu.
-    title_font = pygame.font.Font(None, 80)
+    title_font = pygame.font.Font(r"Font/Nunito-Black.ttf", 80)
     title = title_font.render("Main Menu", True, (250, 250, 250))
     title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4))
 
@@ -347,24 +352,27 @@ def menu(game_state):
                     start = True
                     loop = False
                 elif options_button.is_clicked(mouse_x, mouse_y):
-                    game_state = options(game_state)
+                    game_state, end = options(game_state)
+                    if end:
+                        loop = False
+                        end = True
                     # Redraw the menu when returning from options.
                 elif exit_button.is_clicked(mouse_x, mouse_y):
                     end = True
                     loop = False
+        if not end:
+            mouse_pos = pygame.mouse.get_pos()
+            # Refresh background and title.
+            draw_gradient(
+                screen, (30, 30, 80), (10, 10, 40), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+            )
+            screen.blit(title, title_rect)
+            play_button.draw(screen, mouse_pos)
+            options_button.draw(screen, mouse_pos)
+            exit_button.draw(screen, mouse_pos)
 
-        mouse_pos = pygame.mouse.get_pos()
-        # Refresh background and title.
-        draw_gradient(
-            screen, (30, 30, 80), (10, 10, 40), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
-        )
-        screen.blit(title, title_rect)
-        play_button.draw(screen, mouse_pos)
-        options_button.draw(screen, mouse_pos)
-        exit_button.draw(screen, mouse_pos)
-
-        pygame.display.update()
-        clock.tick(60)
+            pygame.display.update()
+            clock.tick(60)
 
     return start, end
 
@@ -391,7 +399,7 @@ def options(game_state):
         screen, (60, 60, 120), (20, 20, 40), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
     )
 
-    title_font = pygame.font.Font(None, 80)
+    title_font = pygame.font.Font(r"Font/Nunito-Black.ttf", 80)
     title = title_font.render("Options", True, (250, 250, 250))
     title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4))
 
@@ -407,7 +415,7 @@ def options(game_state):
         base_color=(204, 0, 0),
         hover_color=(255, 51, 51),
     )
-
+    end = False
     loop = True
     while loop:
         # Redraw the background each frame.
@@ -417,7 +425,7 @@ def options(game_state):
         screen.blit(title, title_rect)
 
         # Display the current angel power.
-        power_text = pygame.font.Font(None, 36).render(
+        power_text = pygame.font.Font(r"Font/Nunito-Black.ttf", 36).render(
             f"Angel Power: {angel_power}", True, (250, 250, 250)
         )
         power_text_rect = power_text.get_rect(
@@ -433,6 +441,7 @@ def options(game_state):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 loop = False
+                end = True
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if up_button.is_clicked(mouse_x, mouse_y):
@@ -452,7 +461,7 @@ def options(game_state):
 
         pygame.display.update()
         clock.tick(60)
-    return game_state
+    return game_state, end
 
 
 # A helper to centre the grid view on a given input
@@ -622,27 +631,19 @@ def gameloop(game_state):
                             if checkWin(game_state):
                                 win = True
             if event.type == pygame.KEYDOWN:
-                if event.key in [
-                    pygame.K_w,
-                    pygame.K_a,
-                    pygame.K_s,
-                    pygame.K_d,
-                    pygame.K_LEFT,
-                    pygame.K_RIGHT,
-                    pygame.K_UP,
-                    pygame.K_DOWN,
-                ]:
-                    game_state = moveGrid(game_state, event.key)
-                elif event.key == pygame.K_u:
-                    if game_state.undo_stack:
-                        current_player = "Angel" if turn_number % 2 == 0 else "Devil"
-                        turn_number -= 1
-                    game_state = undoMove(game_state)
-                elif event.key == pygame.K_r:
-                    if game_state.redo_stack:
-                        current_player = "Angel" if turn_number % 2 == 0 else "Devil"
-                        turn_number += 1
-                    game_state = redoMove(game_state)
+                match event.key:
+                    case pygame.K_w|pygame.K_a|pygame.K_s|pygame.K_d|pygame.K_LEFT|pygame.K_RIGHT|pygame.K_UP|pygame.K_DOWN:
+                        game_state = moveGrid(game_state, event.key)
+                    case pygame.K_u:
+                        if game_state.undo_stack:
+                            current_player = "Angel" if turn_number % 2 == 0 else "Devil"
+                            turn_number -= 1
+                        game_state = undoMove(game_state)
+                    case pygame.K_r:
+                        if game_state.redo_stack:
+                            current_player = "Angel" if turn_number % 2 == 0 else "Devil"
+                            turn_number += 1
+                        game_state = redoMove(game_state)
 
         renderGrid(
             screen,
@@ -659,7 +660,7 @@ def gameloop(game_state):
     # Display win screen for the Devil
     while True:
         clearScreen(screen, (200, 0, 0))
-        font = pygame.font.Font(None, 74)
+        font = pygame.font.Font(r"Font/Nunito-Black.ttf", 74)
         win_text = font.render("Devil Wins!", True, (255, 255, 255))
         win_rect = win_text.get_rect(
             center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 100)
@@ -787,7 +788,7 @@ def renderGrid(
     ui_centre_x = game_state.GRID_AREA_WIDTH + side_panel_width // 2
 
     # Draw the turn and status information in the side panel.
-    font = pygame.font.Font(None, 36)
+    font = pygame.font.Font(r"Font/Nunito-Black.ttf", 36)
     player_text = font.render(
         "Current Player:",
         True,
@@ -910,7 +911,6 @@ def checkWin(game_state):
                 # Found at least one legal move
                 return False
 
-    # If every candidate move is blocked, the angel is trapped.
     return True
 
 
